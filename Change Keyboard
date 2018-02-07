@@ -1,0 +1,12 @@
+(EnterValue as text, ColumnFrom as text,ColumnTo as text ) as table =>
+let
+    Keyboard= Table.FromRows(Json.Document(Binary.Decompress(Binary.FromText("LZFXTgJhFIX38j8TXIBLmUyCXRTsBXmi9xITo9tAutQtwI48hTDz5Tsn9859IIrC/jMkQgovHniciMLuD/6IVwKw3Nfg7xyqGSrL8AvmsqH1BfyJmwtD5QT+wjwxVK7hH8xrQ+UI/so8MnSoAU/zRsNQ2YTfMzcNrc/gD9ycGZqswiMOVQ2VLXjM/EO0XFbgJ8wVQ2Ub/sz8TbR9aAg/542hoXIAv2QeGCq38CvmraFvFuDX/FzB0OQGfsOhjaFyCb9lXhoqx/AM89hQOYUfM08NHeoe/twvouuuD88z9w2VdXiOuW6oLMLPmIuG7qzgbzyxMlTO4afMc0PrJfgdN0uGyg48y9wxtP4L508CaLIHT3KoZ7BkPjr0yRDH/w==", BinaryEncoding.Base64), Compression.Deflate)), let _t = ((type text) meta [Serialized.Text = true]) in type table [RU = _t, ENG = _t, UKR = _t, RUS = _t]),
+    ChangeType = Table.TransformColumnTypes(Keyboard,{{"RU", type text}, {"ENG", type text}, {"UKR", type text}, {"RUS", type text}}),
+    Replace = Table.ReplaceValue(ChangeType,"","'",Replacer.ReplaceValue,{"RU", "ENG", "UKR", "RUS"}),
+    SelectColumns = Table.SelectColumns(Replace,{ColumnFrom, ColumnTo}),
+    Source = EnterValue,
+    ToTable = Table.RenameColumns(Table.TransformColumnTypes( #table(1, {{Source}}),{{"Column1", type text}}),{{"Column1", "WhatChange"}}),
+    ToLower = Table.TransformColumns(ToTable,{{"WhatChange", Text.Lower, type text}}),
+    ChangingKeyboard = Table.AddColumn(ToLower, "ChangingKeyboard", each Text.Combine(List.ReplaceMatchingItems(Text.ToList([WhatChange]), List.Zip(Table.ToColumns(SelectColumns)))))	
+in
+    ChangingKeyboard
