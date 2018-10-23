@@ -1,0 +1,86 @@
+library(readxl)
+library(writexl)
+library(tidyverse)
+library(dplyr)
+setwd("D:/Users/USER/Desktop/R Scripts")
+db <- read_excel("from.xlsx", col_types = c("text", "text", "text", "text", "text", 
+                                              "text", "numeric", "numeric", "numeric", "numeric", 
+                                              "numeric", "date", "date", "date", "date", 
+                                              "date", "date", "text", "text", "text",
+                                              "text", "text", "text", "text", "text", 
+                                              "text", "text", "text", "text", "text", 
+                                              "text", "numeric", "text", "text", "text",
+                                              "text", "text", "text", "text", "text",
+                                              "text","text", "text", "text", "text",
+                                              "text", "text", "text", "text", "text",
+                                              "text", "text", "text", "text", "text",
+                                              "text", "text", "text", "text", "text",
+                                              "text", "text", "text","text", "text",
+                                              "text", "text", "numeric", "text", "text",
+                                              "text", "text", "text", "text", "text",
+                                              "text", "text", "text", "text", "text",
+                                              "date", "text", "text", "text", "text"))
+SP <- read_excel("o:/Справочник Каналов продаж 3 уровня/Справочник ПП с АВАРД.xlsx", sheet = 3, col_types = c(
+  "numeric", "text" , "text", "text", "text", 
+  "text", "text", "text", "text", "text", 
+  "text", "text", "text", "text", "text",
+  "text", "text", "text", "text", "text"
+))
+i_activation <- subset(SP, SP$"Модель продажів" == "Hybrid" & 
+                         SP$"Канал продажів 1-го рівня" != "Агентська мережа")
+i_act <- i_activation$"Код"
+
+web <- subset(db, db$"Тип заявки 1 в столе заказов" == "Вхідний дзвінок WEB" | db$"Тип заявки 1 в столе заказов" == 
+                "Вхідний дзвінок WEB Кросс-продажі")
+site <- subset(db, db$"Тип заявки 1 в столе заказов" == "Сайт АХА" | db$"Тип заявки 1 в столе заказов" == "Сайт АХА Кросс-продажі")
+online <- subset(db, db$"Согласованная модель продаж" == "On-line")
+iact <- subset(db, db$"Код программы продаж" %in% i_act)
+
+#Sales programms - site
+db_short <- filter(db, !str_detect(db$"Название программы продаж", "сайт|Сайт"))
+db_short$Type1 <- NA
+db_short$Type <- NA
+del <- filter(db, str_detect(db$"Название программы продаж", "доставка|Доставка"))
+db_short <- filter(db_short, !str_detect(db_short$"Название программы продаж", "доставка|Доставка"))
+sp_site <- filter(db, str_detect(db$"Название программы продаж", "сайт|Сайт"))
+sp_site$Type1 <- ifelse(is.na(sp_site$"Тип заявки 1 в столе заказов"), "ПП - сайт", 
+                          ifelse(sp_site$"Тип заявки 1 в столе заказов" == "UWS", "UW System",
+                                 ifelse(sp_site$"Тип заявки 1 в столе заказов" == "Вхідний дзвінок", "non Web-call", NA)))
+sp_site$Type <- "ПП - сайт"
+if(nrow(del)>0){
+  del$Type1 <- "Main"
+  del$Type <- "On-line buying + delivery" 
+}
+db <- rbind(db_short, sp_site, del)
+#DB_short
+db_short <- filter(db, !(db$"Код программы продаж" %in% i_act), db$"Согласованная модель продаж" != "On-line", 
+            !(db$"Тип заявки 1 в столе заказов" %in% c("Сайт АХА", "Сайт АХА Кросс-продажі", "Вхідний дзвінок WEB",
+                                                       "Тип заявки 1 в столе заказов")))
+#WEB
+web$Type1 <- ifelse(web$"Тип заявки 1 в столе заказов" == "Вхідний дзвінок WEB","Main",
+                      ifelse(web$"Тип заявки 1 в столе заказов" == "Вхідний дзвінок WEB Кросс-продажі","Cross", NA))
+web$Type <- "Web-call"
+#Site
+site$Type1 <- ifelse(site$"Тип заявки 1 в столе заказов" == "Сайт АХА Кросс-продажі","Cross",
+                       ifelse(site$"Тип заявки 1 в столе заказов" == "Сайт АХА","Main", NA))
+site$Type <- "Lead"
+#online
+online$Type1 <- "Not allocated"
+online$Type <- "Not allocated"
+#Iact
+iact$Type1 <- "Main"
+iact$Type <- "I-activation"
+
+db <- rbind(db_short, web, site, online, iact)
+
+#Business
+db$Status <- ifelse(is.na(db$Type), NA,
+                      ifelse(db$"Статус пролонгации" %in% c("Пролонгація", "Пролонгація стандарт"), "renewals", 
+                      ifelse(db$"Статус пролонгации" %in% c(NA, "Новий бізнес"),"new business", NA)))
+
+write.csv2(db, "to.csv", na = "")
+
+tmp <- matrix(c(nrow(filter(db, db$"Согласованная модель продаж" %in% c("On-line", "Hybrid"), is.na(db$Type1))), 
+         nrow(filter(db, db$"Согласованная модель продаж" %in% c("On-line", "Hybrid"), is.na(db$Type)))))
+rownames(tmp) <- c("Type1 - ","Type - ")
+write.table(tmp, "Errors.txt")
